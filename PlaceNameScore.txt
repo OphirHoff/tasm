@@ -1,0 +1,190 @@
+;--------------------------
+numOffset equ [bp+4] ; offset of number in char on DS
+intNum    equ [bp-2]
+
+;Returned value at ax
+
+proc ConvertCharToInt
+
+	push bp
+	mov bp, sp
+	sub sp, 2
+	
+	; push bx
+	; push cx
+	; push dx
+	; push si
+
+	mov intNum, 0
+	mov bx, numOffset
+	mov si, 0 ; Goes over the chars of score ('123')
+	mov dx, 100 ; Hunderds, tens, units
+	mov cx, 3
+	Convert:
+	mov al, [bx+si]
+	sub al, '0'
+	xor ah, ah
+	push bx
+	mul dl
+	pop bx
+	add intNum, ax
+	
+	push bx
+	mov ax, dx
+	mov bl, 10
+	div bl
+	pop bx
+	mov dx, ax
+	
+	inc si
+	
+	loop Convert
+	
+	mov ax, intNum
+	
+	; pop si
+	; pop dx
+	; pop cx
+	; pop bx
+	
+	add sp, 2
+	pop bp
+
+	ret 2
+endp ConvertCharToInt
+;--------------------------
+proc FindScore
+
+	; save last spot (later make space for new score after this location)
+	mov ah, 42h
+	mov al, 1
+	mov bx, [FileHandle]
+	mov cx, 0
+	mov dx, 0
+	int 21h
+	mov [saveFilePointer], ax
+
+	mov dx, offset ReadFileByte
+	
+	SearchScore:
+	mov ah, 3Fh
+	mov bx, [FileHandle]
+	mov cx, 1
+	int 21h ; read one byte from file (goes to [ReadFileByte])
+	
+	cmp [ReadFileByte], ":" ; check if char is ":"
+	jne SearchScore
+	
+	; ↓ Found ":" ↓
+	                            
+	; move reading pointer 1 byte forward to get to score(name: 000)
+	mov ah, 42h                                            ;   ↑↑
+	mov al, 1
+	mov bx, [FileHandle]
+	mov cx, 0
+	mov dx, 1
+	int 21h
+	
+	; Read Score (into [ReadScore] variable)
+	mov dx, offset ReadScore
+	mov ah, 3Fh
+	mov bx, [FileHandle]
+	mov cx, 3
+	int 21h
+
+	; Convert num from string to int - return in ax
+	push offset ReadScore
+	call ConvertCharToInt
+	
+	;------------------------------
+	; push ax
+	; Move to next line (next score) on file (line down=10,13)
+	; mov ah, 42h                                      
+	; mov al, 1
+	; mov bx, [FileHandle]
+	; mov cx, 0
+	; mov dx, 2
+	; int 21h
+	; pop ax
+	;------------------------------
+
+	ret
+endp FindScore
+;--------------------------
+proc PlaceNameScore
+	
+	; move reading pointer to the beggining of the file
+	mov ah, 42h
+	mov al, 0
+	mov bx, [FileHandle]
+	mov cx, 0
+	mov dx, 0
+	int 21h
+	
+	SearchPlaceArray:
+	call FindScore ; Find Score in scores.txt - return in ax
+	cmp al, [score] ; Check if current score in the array is smaller than current player's score
+	jbe Found
+	
+	; Move to next line (next score=2bytes) on file (line down=10)
+	mov ah, 42h                                      
+	mov al, 1
+	mov bx, [FileHandle]
+	mov cx, 0
+	mov dx, 2
+	int 21h
+	
+	jmp SearchPlaceArray
+	
+	Found:
+	
+	; Move file pointer to score the was found
+	mov ah, 42h
+	mov al, 0
+	mov bx, [FileHandle]
+	mov cx, 0
+	mov dx, [saveFilePointer]
+	int 21h
+	
+	; Move File Pointer 2 bytes backwards
+	mov ah, 42h
+	mov al, 1
+	mov bx, [FileHandle]
+	mov cx, 0
+	mov dx, -2 ; 2 *back*
+	int 21h
+	
+	; Make 2 new lines
+	; mov cx, 2
+	; WriteLine:
+	; push cx
+	; mov ah, 40h
+	; mov bx, [FileHandle]
+	; lea dx, LineDown
+	; mov cx, 2
+	; int 21h
+	; pop cx
+	; loop WriteLine
+	
+	; Go two Lines up
+	; 1. Find pointer's current location in file
+	; mov ah, 42h
+	; mov al, 0
+	; mov bx, [FileHandle]
+	; mov cx, 0
+	; mov dx, 0
+	; int 21h
+	
+	; sub ax, 2 ; Find destination (2 backwards)
+	
+	; 2. move pointer to destination
+	; mov ah, 42h
+	; mov al, 0
+	; mov bx, [FileHandle]
+	; mov cx, 0
+	; mov dx, ax
+	; int 21h
+	
+	ret
+endp PlaceNameScore
+;--------------------------

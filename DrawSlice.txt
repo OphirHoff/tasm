@@ -1,0 +1,33 @@
+;--------------------------
+x equ [pri1+si+XonDS]
+y equ [byte pri1+si+YonDS]
+
+proc DrawSlice
+	mov dx, offset SlicePic
+	mov bx, x
+	mov [BmpLeft], bx
+	xor bx, bx
+	mov bl, y
+	mov [BmpTop], bx
+	mov [BmpColSize], 40
+	mov [BmpRowSize], 39
+	push si
+	call OpenShowBmp
+	pop si
+	
+	cmp [ErrorFile],1
+	jne @@Cont 
+	
+@@exitError:
+	mov ax,2
+	int 10h
+	
+    mov dx, offset BmpFileErrorMsg
+	mov ah,9
+	int 21h
+	jmp @@exitError
+	
+	@@Cont:
+	
+	ret
+endp DrawSlice
